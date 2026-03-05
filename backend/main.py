@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
 from integrations import validate_environment, process_voice_input
+from backend.routes.voice import router as voice_router
 
 # Initialize FastAPI
 app = FastAPI(
@@ -25,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.include_router(voice_router, prefix="/api")
 @app.on_event("startup")
 async def startup_event():
     """Validate environment on startup"""
