@@ -1,13 +1,13 @@
 """
 Main FastAPI Application
-Person 5: Voice + Integrations + DevOps
+Person 2: Backend API Developer
+Person 5: Environment validation integration
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import tempfile
-from integrations import validate_environment, process_voice_input
+
+from integrations import validate_environment
 from backend.routes.voice import router as voice_router
 
 # Initialize FastAPI
@@ -17,114 +17,48 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS Configuration
+# CORS configuration (allow frontend access)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
+    allow_origins=["*"],   # change in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register routers
 app.include_router(voice_router, prefix="/api")
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Validate environment on startup"""
+    """
+    Validate environment variables on startup
+    """
     try:
         validate_environment()
         print("✅ Environment validation passed")
-    except EnvironmentError as e:
+    except Exception as e:
         print(f"❌ Environment validation failed: {e}")
         raise
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """
+    Basic health check endpoint
+    """
     return {
         "status": "healthy",
         "service": "AI Pregnancy Companion API"
     }
 
 
-@app.post("/api/voice/transcribe")
-async def transcribe_voice(audio_file: UploadFile = File(...)):
-    """
-    Transcribe audio file using Whisper
-    
-    Args:
-        audio_file: Audio file (mp3, wav, m4a, etc.)
-    
-    Returns:
-        Transcribed text
-    """
-    try:
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            content = await audio_file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
-        
-        # Import here to avoid circular imports
-        from integrations import transcribe_audio
-        
-        # Transcribe
-        transcribed_text = transcribe_audio(tmp_path)
-        
-        # Cleanup
-        os.unlink(tmp_path)
-        
-        return {
-            "status": "success",
-            "transcription": transcribed_text
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/voice/process")
-async def process_voice(audio_file: UploadFile = File(...)):
-    """
-    Full pipeline: Audio → Transcription → ML Processing
-    
-    Args:
-        audio_file: Audio file for processing
-    
-    Returns:
-        ML engine response
-    """
-    try:
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            content = await audio_file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
-        
-        # Import ML module (to be implemented by ML person)
-        try:
-            from ml_engine import ml_model
-        except ImportError:
-            raise ImportError("ML engine not configured. Contact ML person.")
-        
-        # Process voice input
-        result = process_voice_input(tmp_path, ml_model)
-        
-        # Cleanup
-        os.unlink(tmp_path)
-        
-        return {
-            "status": "success",
-            "result": result
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/api/status")
 async def status():
-    """Check API and integrations status"""
+    """
+    Check API and integrations status
+    """
     try:
         validate_environment()
         return {
@@ -142,4 +76,4 @@ async def status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
